@@ -1,0 +1,63 @@
+# Compiled object files
+*.o
+*.lo
+*.ko
+*.obj
+*.elf
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Compiled executables
+*.out
+*.app
+
+# Build directories
+_build/
+bin/
+lib/
+obj/
+target/
+
+# Editor and IDE files
+.vscode/
+*.swp
+*~
+*.bak
+
+# Scheme/Racket specific files
+*.zo
+*.compiled
+*.zci
+*.boot
+.plt/
+*.psc
+
+# C/C++ specific files
+*.d
+*.dep
+*.gcno
+*.gcda
+*.gcov
+*.stackdump
+*.log
+*.ipch/
+*.sdf
+*.suo
+*.aps
+*.lib
+*.pdb
+*.ilk
+*.obj
+*.ncb
+*.idb
+*.pch
+*.sbr
+*.pdb
+*.ilk
+*.tlog
+
+# Miscellaneous files
+.DS_Store
+Thumbs.db
