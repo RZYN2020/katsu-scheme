@@ -42,10 +42,10 @@ operator = { exp }
 operand  = { exp }
 
 lambda  = {
-    "(" ~ "lambda" ~ "(" ~ formals ~ ")" ~ body ~ ")"
+    "(" ~ "lambda" ~ "(" ~ formals ~ ")" ~ def* ~ exp ~ ")"
 }
 formals = { identifier | "(" ~ identifier* ~ ")" }
-body    = { def* ~ exp }
+definitions = { def* }
 
 cond       = {
     "(" ~ "if" ~ test ~ consequent ~ alternate ~ ")"
@@ -81,6 +81,7 @@ datum          = {
 simple_datum   = {
     boolean
   | number
+  | string
   | symbol
 }
 symbol         = { identifier }

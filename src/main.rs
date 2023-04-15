@@ -35,7 +35,7 @@ fn repl() {
 }
 
 fn run(program: &str) {
-    let sexpr = parser::parse(&program).unwrap();
+    let sexpr = parser::parse(&program, "init").unwrap();
     let ir = irgenerator::generate(sexpr).unwrap();
     output_program(&ir);
 }
