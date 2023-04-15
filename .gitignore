@@ -1,3 +1,7 @@
+# Cmake
+build
+cmake-build-debug
+
 # Compiled object files
 *.o
 *.lo
@@ -22,6 +26,7 @@ target/
 
 # Editor and IDE files
 .vscode/
+.idea/
 *.swp
 *~
 *.bak
@@ -61,3 +66,7 @@ target/
 # Miscellaneous files
 .DS_Store
 Thumbs.db
+
+# Added by cargo
+
+/target

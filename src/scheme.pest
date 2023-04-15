@@ -1,0 +1,127 @@
+// Programs and definitions
+prog = {
+    SOI ~ (exp | def)* ~ EOI
+}
+
+def = {
+    "(" ~ "define" ~ identifier ~ exp ~ ")"
+}
+
+// Expressions
+
+exp = {
+    identifier
+  | literal
+  | call
+  | lambda
+  | cond
+  | derived
+  | io
+}
+
+literal = {
+    quotation
+  | self_evaluating
+}
+
+self_evaluating = {
+    boolean
+  | number
+  | string
+}
+
+quotation = {
+    "'" ~ datum
+  | "(" ~ "quote" ~ datum ~ ")"
+}
+
+call     = {
+    "(" ~ operator ~ operand* ~ ")"
+}
+operator = { exp }
+operand  = { exp }
+
+lambda  = {
+    "(" ~ "lambda" ~ "(" ~ formals ~ ")" ~ body ~ ")"
+}
+formals = { identifier | "(" ~ identifier* ~ ")" }
+body    = { def* ~ exp }
+
+cond       = {
+    "(" ~ "if" ~ test ~ consequent ~ alternate ~ ")"
+}
+test       = { exp }
+consequent = { exp }
+alternate  = { exp | "" }
+
+derived     = {
+    "(" ~ "cond" ~ cond_clause* ~ ")"
+  | "(" ~ "cond" ~ cond_clause+ ~ "(" ~ "else" ~ exp ~ ")" ~ ")"
+  | "(" ~ "and" ~ test* ~ ")"
+  | "(" ~ "or" ~ test* ~ ")"
+  | "(" ~ "let" ~ "(" ~ binding* ~ ")" ~ exp ~ ")"
+}
+cond_clause = {
+    "(" ~ test ~ exp ~ ")"
+}
+binding = { "(" ~ identifier ~ exp ~ ")" }
+
+
+io = {
+    "(" ~ "display" ~ exp ~ ")"
+  | "(" ~ "newline" ~ ")"
+  | "(" ~ "read" ~ ")"
+}
+
+// External representations (Datum)
+datum          = {
+    simple_datum
+  | compound_datum
+}
+simple_datum   = {
+    boolean
+  | number
+  | symbol
+}
+symbol         = { identifier }
+compound_datum = {
+    list
+  | abbr
+}
+list           = {
+    "(" ~ datum* ~ ")"
+  | "(" ~ datum+ ~ "." ~ datum ~ ")"
+}
+abbr           = {
+    "'" ~ datum
+}
+
+// Identifier
+identifier = @{ initial ~ subsequent* | peculiar }
+
+initial = @{ ASCII_ALPHA | "!" | "$" | "%" | "&" | "*" | "/" | ":" | "<" | "=" | ">" | "?" | "^" | "_" | "~" }
+
+subsequent = @{ initial | ASCII_DIGIT | explicit_sign | "." }
+
+explicit_sign = @{ "+" | "-" }
+
+peculiar = @{
+    explicit_sign
+  | explicit_sign ~ sign_subsequent ~ subsequent*
+  | explicit_sign ~ "." ~ dot_subsequent ~ subsequent*
+}
+
+dot_subsequent = @{ sign_subsequent | "." }
+
+sign_subsequent = @{ initial | explicit_sign }
+
+// Literals
+boolean =  { "#t" | "#f" }
+number  = @{ sign ~ ASCII_DIGIT+ }
+sign    =  { "+" | "-" | "" }
+string  = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+
+// Whitespace
+WHITESPACE     = _{ " " | "\t" | LINE_SEPARATOR }
+COMMENT        = _{ ";" ~ (!LINE_SEPARATOR ~ ANY)* ~ LINE_SEPARATOR }
+LINE_SEPARATOR = _{ "\n" | "\r" | "\r\n" }
