@@ -9,6 +9,8 @@ use std::io::{stdin, stdout};
 use std::io::Write;
 use clap::Parser;
 use interpreter::Env;
+use std::rc::Rc;
+use parser::Exp;
 
 #[derive(Debug, clap::Parser)]
 #[clap(version)]
@@ -27,20 +29,25 @@ fn repl() {
         print!("> ");
         stdout().flush().unwrap();
         stdin().read_line(&mut line).unwrap();
-        if line.trim() == "quit" {
+        if line.trim() == "quit" || line.trim() == "q" {
             break;
         } else if line.is_empty() {
             continue;
         }
-        run(&line, &mut env);
+        let res = run(&line, &mut env);
+        if let Some(res) = res {
+            println!("{:?}", res);
+        }
     }
 }
 
-fn run(program: &str, env: &mut Env) {
+fn run(program: &str, env: &mut Env) -> Option<Rc<Exp>>{
     let ast = parser::parse(&program, "init").unwrap();
+    let mut res = None;
     for top in ast.tops {
-       interpreter::eval(top, env).unwrap();
+       res = interpreter::eval(top, env).unwrap();
     }
+    res
 }
 
 

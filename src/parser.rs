@@ -1,5 +1,6 @@
 use pest::iterators::{Pair, Pairs};
 use pest::Parser;
+use std::rc::Rc;
 
 #[derive(Parser)]
 #[grammar = "scheme.pest"]
@@ -49,8 +50,8 @@ pub struct Ast {
 
 #[derive(Debug)]
 pub enum Top {
-    DEC { identifier: String, expression: Exp },
-    EXP { expression: Exp },
+    DEC { identifier: String, expression: Rc<Exp> },
+    EXP { expression: Rc<Exp> },
 }
 
 #[derive(Debug)]
@@ -58,18 +59,18 @@ pub enum Exp {
     IDENTIFIER(String),
     LITERIAL(Datum),
     CALL {
-        operator: Box<Exp>,
-        operands: Vec<Exp>,
+        operator: Rc<Exp>,
+        operands: Vec<Rc<Exp>>,
     },
     LAMBDA {
         parameters: Vec<String>,
-        definitions: Vec<(String, Exp)>,
-        body: Box<Exp>,
+        definitions: Vec<(String, Rc<Exp>)>,
+        body: Rc<Exp>,
     },
     COND {
-        test: Box<Exp>,
-        consequent: Box<Exp>,
-        alternative: Option<Box<Exp>>,
+        test: Rc<Exp>,
+        consequent: Rc<Exp>,
+        alternative: Option<Rc<Exp>>,
     },
 }
 
@@ -79,8 +80,8 @@ pub enum Datum {
     BOOLEAN(bool),
     STRING(String),
     SYMBOL(String),
-    ABBR(Box<Datum>),
-    COMPOUND((Option<Box<Datum>>, Option<Box<Datum>>)),
+    ABBR(Rc<Datum>),
+    PAIR((Option<Rc<Datum>>, Option<Rc<Datum>>)),
     NULL,
 }
 
@@ -92,7 +93,7 @@ fn build_compound(pair: Pair<Rule>) -> Option<Datum> {
             let mut curr = Datum::NULL;
             while let Some(p) = pairs.next() {
                 let datum = build_datum(p)?;
-                curr = Datum::COMPOUND((Some(Box::new(datum)), Some(Box::new(curr))));
+                curr = Datum::PAIR((Some(Rc::new(datum)), Some(Rc::new(curr))));
             }
             Some(curr)
         }
@@ -101,7 +102,7 @@ fn build_compound(pair: Pair<Rule>) -> Option<Datum> {
             let mut curr = build_datum(pairs.next()?)?;
             while let Some(p) = pairs.next() {
                 let datum = build_datum(p)?;
-                curr = Datum::COMPOUND((Some(Box::new(datum)), Some(Box::new(curr))));
+                curr = Datum::PAIR((Some(Rc::new(datum)), Some(Rc::new(curr))));
             }
             Some(curr)
         }
@@ -131,7 +132,7 @@ fn build_datum(pair: Pair<Rule>) -> Option<Datum> {
                 Rule::abbr => {
                     let abbr = inner1!(compound_datum);
                     let datum = build_datum(abbr)?;
-                    Some(Datum::ABBR(Box::new(datum)))
+                    Some(Datum::ABBR(Rc::new(datum)))
                 }
                 _ => unreachable!(),
             }
@@ -158,10 +159,10 @@ fn build_call(pair: Pair<Rule>) -> Option<Exp> {
     let operator = build_exp(inner2!(pairs.next()?))?;
     let mut operands = Vec::new();
     for pair in pairs {
-        operands.push(build_exp(inner2!(pair))?);
+        operands.push(Rc::new(build_exp(inner2!(pair))?));
     }
     Some(Exp::CALL {
-        operator: Box::new(operator),
+        operator: Rc::new(operator),
         operands,
     })
 }
@@ -176,10 +177,10 @@ fn build_lambda(pair: Pair<Rule>) -> Option<Exp> {
     for pair in pairs.next()?.into_inner() {
         let mut pairs = pair.into_inner();
         let identifier = pairs.next()?.as_str().to_string();
-        let expression = build_exp(pairs.next()?)?;
+        let expression = Rc::new(build_exp(pairs.next()?)?);
         definitions.push((identifier, expression));
     }
-    let body = Box::new(build_exp(inner1!(pairs.next()?))?);
+    let body = Rc::new(build_exp(inner1!(pairs.next()?))?);
     return Some(Exp::LAMBDA {
         parameters,
         definitions,
@@ -190,10 +191,10 @@ fn build_lambda(pair: Pair<Rule>) -> Option<Exp> {
 fn build_cond(pair: Pair<Rule>) -> Option<Exp> {
     let mut pairs = pair.into_inner();
     let mut alternative = None;
-    let test = Some(Box::new(build_exp(inner2!(pairs.next()?))?));
-    let consequent = Some(Box::new(build_exp(inner2!(pairs.next()?))?));
+    let test = Some(Rc::new(build_exp(inner2!(pairs.next()?))?));
+    let consequent = Some(Rc::new(build_exp(inner2!(pairs.next()?))?));
     if let Some(pair) = pairs.next() {
-        alternative = Some(Box::new(build_exp(inner2!(pair))?));
+        alternative = Some(Rc::new(build_exp(inner2!(pair))?));
     }
     return Some(Exp::COND {
         test: test?,
@@ -241,13 +242,13 @@ fn build_ast(pairs: Pairs<Rule>, name: &str) -> Option<Ast> {
             Rule::exp => {
                 let pair = inner1!(pair);
                 ast.tops.push(Top::EXP {
-                    expression: build_exp(pair)?,
+                    expression: Rc::new(build_exp(pair)?),
                 });
             }
             Rule::def => {
                 let mut pairs = pair.into_inner();
                 let identifier = pairs.next()?.as_str().to_string();
-                let expression = build_exp(inner1!(pairs.next()?))?;
+                let expression = Rc::new(build_exp(inner1!(pairs.next()?))?);
                 ast.tops.push(Top::DEC {
                     identifier,
                     expression,
