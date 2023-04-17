@@ -1,12 +1,4 @@
-# Why I start this project?
-
-Programming Language is such a fasinating field
-
-
-
 Extended from pr7rs https://github.com/jrincayc/r7rs-pico-spec
-
-
 
 
 Extended Features:
