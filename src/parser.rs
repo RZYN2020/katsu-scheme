@@ -9,7 +9,7 @@ macro_rules! handle_literals {
     ($item:expr) => {
         match $item.as_rule() {
             Rule::number => {
-                let number = $item.as_str().parse::<i64>().unwrap();
+                let number = $item.as_str().parse::<i64>().ok()?;
                 return Some(Datum::NUMBER(number));
             }
             Rule::boolean => {
@@ -26,6 +26,18 @@ macro_rules! handle_literals {
             }
             _ => unreachable!(),
         }
+    };
+}
+
+macro_rules! inner1 {
+    ($item:expr) => {
+        $item.into_inner().next()?
+    };
+}
+
+macro_rules! inner2 {
+    ($item:expr) => {
+        $item.into_inner().next()?.into_inner().next()?
     };
 }
 
@@ -73,22 +85,22 @@ pub enum Datum {
 }
 
 fn build_compound(pair: Pair<Rule>) -> Option<Datum> {
-    let pair = pair.into_inner().next().unwrap();
+    let pair = inner1!(pair);
     match pair.as_rule() {
         Rule::pure_list => {
             let mut pairs = pair.into_inner().rev();
             let mut curr = Datum::NULL;
             while let Some(p) = pairs.next() {
-                let datum = build_datum(p).unwrap();
+                let datum = build_datum(p)?;
                 curr = Datum::COMPOUND((Some(Box::new(datum)), Some(Box::new(curr))));
             }
             Some(curr)
         }
         Rule::list_pair => {
             let mut pairs = pair.into_inner().rev();
-            let mut curr = build_datum(pairs.next().unwrap()).unwrap();
+            let mut curr = build_datum(pairs.next()?)?;
             while let Some(p) = pairs.next() {
-                let datum = build_datum(p).unwrap();
+                let datum = build_datum(p)?;
                 curr = Datum::COMPOUND((Some(Box::new(datum)), Some(Box::new(curr))));
             }
             Some(curr)
@@ -100,7 +112,7 @@ fn build_compound(pair: Pair<Rule>) -> Option<Datum> {
 fn build_datum(pair: Pair<Rule>) -> Option<Datum> {
     match pair.as_rule() {
         Rule::simple_datum => {
-            let simple_datum = pair.into_inner().next().unwrap();
+            let simple_datum = inner1!(pair);
             match simple_datum.as_rule() {
                 Rule::number | Rule::boolean | Rule::string => {
                     handle_literals!(simple_datum);
@@ -113,12 +125,12 @@ fn build_datum(pair: Pair<Rule>) -> Option<Datum> {
             }
         }
         Rule::compound_datum => {
-            let compound_datum = pair.into_inner().next().unwrap();
+            let compound_datum = inner1!(pair);
             match compound_datum.as_rule() {
                 Rule::list => build_compound(compound_datum),
                 Rule::abbr => {
-                    let abbr = compound_datum.into_inner().next().unwrap();
-                    let datum = build_datum(abbr).unwrap();
+                    let abbr = inner1!(compound_datum);
+                    let datum = build_datum(abbr)?;
                     Some(Datum::ABBR(Box::new(datum)))
                 }
                 _ => unreachable!(),
@@ -131,10 +143,10 @@ fn build_datum(pair: Pair<Rule>) -> Option<Datum> {
 fn build_literal(pair: Pair<Rule>) -> Option<Datum> {
     match pair.as_rule() {
         Rule::quotation => {
-            return build_datum(pair.into_inner().next().unwrap());
+            return build_datum(inner1!(pair));
         }
         Rule::self_evaluating => {
-            let literal = pair.into_inner().next().unwrap();
+            let literal = inner1!(pair);
             handle_literals!(literal);
         }
         _ => unreachable!(),
@@ -143,10 +155,10 @@ fn build_literal(pair: Pair<Rule>) -> Option<Datum> {
 
 fn build_call(pair: Pair<Rule>) -> Option<Exp> {
     let mut pairs = pair.into_inner();
-    let operator = build_exp(pairs.next().unwrap().into_inner().next().unwrap().into_inner().next().unwrap()).unwrap();
+    let operator = build_exp(inner2!(pairs.next()?))?;
     let mut operands = Vec::new();
     for pair in pairs {
-        operands.push(build_exp(pair.into_inner().next().unwrap().into_inner().next().unwrap()).unwrap());
+        operands.push(build_exp(inner2!(pair))?);
     }
     Some(Exp::CALL {
         operator: Box::new(operator),
@@ -157,17 +169,17 @@ fn build_call(pair: Pair<Rule>) -> Option<Exp> {
 fn build_lambda(pair: Pair<Rule>) -> Option<Exp> {
     let mut pairs = pair.into_inner();
     let mut parameters = Vec::new();
-    for pair in pairs.next().unwrap().into_inner() {
+    for pair in pairs.next()?.into_inner() {
         parameters.push(pair.as_str().to_string());
     }
     let mut definitions = Vec::new();
-    for pair in pairs.next().unwrap().into_inner() {
+    for pair in pairs.next()?.into_inner() {
         let mut pairs = pair.into_inner();
-        let identifier = pairs.next().unwrap().as_str().to_string();
-        let expression = build_exp(pairs.next().unwrap()).unwrap();
+        let identifier = pairs.next()?.as_str().to_string();
+        let expression = build_exp(pairs.next()?)?;
         definitions.push((identifier, expression));
     }
-    let body = Box::new(build_exp(pairs.next().unwrap().into_inner().next().unwrap()).unwrap());
+    let body = Box::new(build_exp(inner1!(pairs.next()?))?);
     return Some(Exp::LAMBDA {
         parameters,
         definitions,
@@ -178,14 +190,14 @@ fn build_lambda(pair: Pair<Rule>) -> Option<Exp> {
 fn build_cond(pair: Pair<Rule>) -> Option<Exp> {
     let mut pairs = pair.into_inner();
     let mut alternative = None;
-    let test = Some(Box::new(build_exp(pairs.next().unwrap().into_inner().next().unwrap().into_inner().next().unwrap()).unwrap()));
-    let consequent = Some(Box::new(build_exp(pairs.next().unwrap().into_inner().next().unwrap().into_inner().next().unwrap()).unwrap()));
+    let test = Some(Box::new(build_exp(inner2!(pairs.next()?))?));
+    let consequent = Some(Box::new(build_exp(inner2!(pairs.next()?))?));
     if let Some(pair) = pairs.next() {
-        alternative = Some(Box::new(build_exp(pair.into_inner().next().unwrap().into_inner().next().unwrap()).unwrap()));
+        alternative = Some(Box::new(build_exp(inner2!(pair))?));
     }
     return Some(Exp::COND {
-        test: test.unwrap(),
-        consequent: consequent.unwrap(),
+        test: test?,
+        consequent: consequent?,
         alternative,
     });
 }
@@ -199,7 +211,7 @@ fn build_exp(pair: Pair<Rule>) -> Option<Exp> {
             Some(Exp::IDENTIFIER(identifier))
         }
         Rule::literal => {
-            let literal = build_literal(pair.into_inner().next().unwrap()).unwrap();
+            let literal = build_literal(inner1!(pair))?;
             Some(Exp::LITERIAL(literal))
         }
         Rule::call => {
@@ -227,15 +239,15 @@ fn build_ast(pairs: Pairs<Rule>, name: &str) -> Option<Ast> {
     for pair in pairs {
         match pair.as_rule() {
             Rule::exp => {
-                let pair = pair.into_inner().next().unwrap();
+                let pair = inner1!(pair);
                 ast.tops.push(Top::EXP {
-                    expression: build_exp(pair).unwrap(),
+                    expression: build_exp(pair)?,
                 });
             }
             Rule::def => {
                 let mut pairs = pair.into_inner();
-                let identifier = pairs.next().unwrap().as_str().to_string();
-                let expression = build_exp(pairs.next().unwrap().into_inner().next().unwrap()).unwrap();
+                let identifier = pairs.next()?.as_str().to_string();
+                let expression = build_exp(inner1!(pairs.next()?))?;
                 ast.tops.push(Top::DEC {
                     identifier,
                     expression,
@@ -251,10 +263,10 @@ fn build_ast(pairs: Pairs<Rule>, name: &str) -> Option<Ast> {
 }
 
 pub fn parse(program: &str, name: &str) -> Option<Ast> {
-    let mut pairs = SchemeParser::parse(Rule::prog, program).ok().unwrap();
+    let mut pairs = SchemeParser::parse(Rule::prog, program).ok()?;
     pairs
         .find(|pair| pair.as_rule() == Rule::prog)
-        .map(|pair| build_ast(pair.into_inner(), name)).unwrap()
+        .map(|pair| build_ast(pair.into_inner(), name))?
 }
 
 mod test {
