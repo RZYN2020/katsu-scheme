@@ -32,7 +32,7 @@ macro_rules! handle_literals {
 #[derive(Debug)]
 pub struct Ast {
     pub name: String,
-    pub args: Vec<Top>,
+    pub tops: Vec<Top>,
 }
 
 #[derive(Debug)]
@@ -222,13 +222,13 @@ fn build_exp(pair: Pair<Rule>) -> Option<Exp> {
 fn build_ast(pairs: Pairs<Rule>, name: &str) -> Option<Ast> {
     let mut ast = Ast {
         name: String::from(name),
-        args: Vec::new(),
+        tops: Vec::new(),
     };
     for pair in pairs {
         match pair.as_rule() {
             Rule::exp => {
                 let pair = pair.into_inner().next().unwrap();
-                ast.args.push(Top::EXP {
+                ast.tops.push(Top::EXP {
                     expression: build_exp(pair).unwrap(),
                 });
             }
@@ -236,7 +236,7 @@ fn build_ast(pairs: Pairs<Rule>, name: &str) -> Option<Ast> {
                 let mut pairs = pair.into_inner();
                 let identifier = pairs.next().unwrap().as_str().to_string();
                 let expression = build_exp(pairs.next().unwrap().into_inner().next().unwrap()).unwrap();
-                ast.args.push(Top::DEC {
+                ast.tops.push(Top::DEC {
                     identifier,
                     expression,
                 });
@@ -252,7 +252,6 @@ fn build_ast(pairs: Pairs<Rule>, name: &str) -> Option<Ast> {
 
 pub fn parse(program: &str, name: &str) -> Option<Ast> {
     let mut pairs = SchemeParser::parse(Rule::prog, program).ok().unwrap();
-    println!("{:?}", pairs);
     pairs
         .find(|pair| pair.as_rule() == Rule::prog)
         .map(|pair| build_ast(pair.into_inner(), name)).unwrap()

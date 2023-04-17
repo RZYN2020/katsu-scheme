@@ -34,7 +34,10 @@ fn repl() {
 
 fn run(program: &str) {
     let sexpr = parser::parse(&program, "init").unwrap();
-    interpreter::run(sexpr);
+    let mut env = interpreter::Env::new();
+    for top in sexpr.tops {
+        env = interpreter::eval(top, env).unwrap();
+    }
 }
 
 fn main() {
