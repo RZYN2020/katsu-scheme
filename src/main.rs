@@ -3,11 +3,9 @@ extern crate pest;
 extern crate pest_derive;
 
 mod parser;        // parse input string to S-expresion
-mod transformer;   // expand macro
-mod irgenerator;   // generator ir for bril
+mod interpreter;   // interpreter
 
 use std::io::{stdin, stdout};
-use bril_rs::output_program;
 use std::io::Write;
 use clap::Parser;
 
@@ -15,7 +13,7 @@ use clap::Parser;
 #[clap(version)]
 struct Opt {
     #[clap(short = 'f', long = "file", help = "input file")]
-    file: String,
+    file: Option<String>,
 
     #[clap(short = 'i', long = "interactive", help = "interactive mode")]
     interactive: bool,
@@ -36,17 +34,19 @@ fn repl() {
 
 fn run(program: &str) {
     let sexpr = parser::parse(&program, "init").unwrap();
-    let ir = irgenerator::generate(sexpr).unwrap();
-    output_program(&ir);
+    interpreter::run(sexpr);
 }
 
 fn main() {
     let opt = Opt::parse();
 
-    if opt.interactive {
+    if let Some(file) = opt.file {
+        let program = std::fs::read_to_string(file).unwrap();
+        run(&program);
+    } else if opt.interactive {
         repl();
     } else {
-        let program = std::fs::read_to_string(opt.file).unwrap();
-        run(&program);
+        repl();
+        println!("No input file or interactive mode");
     }
 }
