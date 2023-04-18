@@ -50,22 +50,22 @@ pub struct Ast {
 
 #[derive(Debug)]
 pub enum Top {
-    DEC { identifier: String, expression: Rc<Exp> },
-    EXP { expression: Rc<Exp> },
+    DEC {
+        identifier: String,
+        expression: Rc<Exp>,
+    },
+    EXP {
+        expression: Rc<Exp>,
+    },
 }
 
 #[derive(Debug)]
 pub enum Exp {
     IDENTIFIER(String),
-    LITERIAL(Datum),
+    LITERIAL(Rc<Datum>),
     CALL {
         operator: Rc<Exp>,
         operands: Vec<Rc<Exp>>,
-    },
-    LAMBDA {
-        parameters: Vec<String>,
-        definitions: Vec<(String, Rc<Exp>)>,
-        body: Rc<Exp>,
     },
     COND {
         test: Rc<Exp>,
@@ -76,13 +76,21 @@ pub enum Exp {
 
 #[derive(Debug)]
 pub enum Datum {
+    LAMBDA(Rc<Lambda>),
     NUMBER(i64),
     BOOLEAN(bool),
     STRING(String),
     SYMBOL(String),
     ABBR(Rc<Datum>),
     PAIR((Option<Rc<Datum>>, Option<Rc<Datum>>)),
-    NULL,
+    NIL,
+}
+
+#[derive(Debug)]
+pub struct Lambda {
+    pub parameters: Vec<String>,
+    pub definitions: Vec<(String, Rc<Exp>)>,
+    pub body: Rc<Exp>,
 }
 
 fn build_compound(pair: Pair<Rule>) -> Option<Datum> {
@@ -90,7 +98,7 @@ fn build_compound(pair: Pair<Rule>) -> Option<Datum> {
     match pair.as_rule() {
         Rule::pure_list => {
             let mut pairs = pair.into_inner().rev();
-            let mut curr = Datum::NULL;
+            let mut curr = Datum::NIL;
             while let Some(p) = pairs.next() {
                 let datum = build_datum(p)?;
                 curr = Datum::PAIR((Some(Rc::new(datum)), Some(Rc::new(curr))));
@@ -181,11 +189,11 @@ fn build_lambda(pair: Pair<Rule>) -> Option<Exp> {
         definitions.push((identifier, expression));
     }
     let body = Rc::new(build_exp(inner1!(pairs.next()?))?);
-    return Some(Exp::LAMBDA {
+    Some(Exp::LITERIAL(Rc::new(Datum::LAMBDA(Rc::new(Lambda {
         parameters,
         definitions,
         body,
-    });
+    })))))
 }
 
 fn build_cond(pair: Pair<Rule>) -> Option<Exp> {
@@ -213,20 +221,12 @@ fn build_exp(pair: Pair<Rule>) -> Option<Exp> {
         }
         Rule::literal => {
             let literal = build_literal(inner1!(pair))?;
-            Some(Exp::LITERIAL(literal))
+            Some(Exp::LITERIAL(Rc::new(literal)))
         }
-        Rule::call => {
-            build_call(pair)
-        }
-        Rule::lambda => {
-            build_lambda(pair)
-        }
-        Rule::cond => {
-            build_cond(pair)
-        }
-        Rule::derived => {
-            None
-        }
+        Rule::call => build_call(pair),
+        Rule::lambda => build_lambda(pair),
+        Rule::cond => build_cond(pair),
+        Rule::derived => None,
         _ => unreachable!(),
     }
 }

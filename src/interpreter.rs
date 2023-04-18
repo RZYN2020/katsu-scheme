@@ -1,57 +1,83 @@
 use crate::parser::*;
+use std::borrow::Borrow;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub struct Env<'a> {
-    parent: Option<&'a Env<'a>>,
-    values: HashMap<String, Rc<Exp>>,
+#[derive(Debug)]
+pub struct Env {
+    parent: Option<Rc<RefCell<Env>>>,
+    values: HashMap<String, Rc<Value>>,
 }
 
-impl<'a> Env<'a> {
+#[derive(Debug)]
+pub struct Clojure {
+    proto: Rc<Lambda>,
+    env: Rc<RefCell<Env>>,
+}
+
+#[derive(Debug)]
+pub enum Value {
+    DATUM(Rc<Datum>),
+    CLOSURE(Rc<Clojure>),
+}
+
+impl Env {
     pub fn new() -> Self {
         Self {
             parent: None,
             values: HashMap::new(),
         }
     }
-    pub fn with_parent(parent: &'a Env<'a>) -> Self {
+    pub fn with_parent(parent: Rc<RefCell<Env>>) -> Self {
         Self {
             parent: Some(parent),
             values: HashMap::new(),
         }
     }
-    fn resolve(&self, identifier: &str) -> Option<&Rc<Exp>> {
+    fn resolve(&self, identifier: &str) -> Option<Rc<Value>> {
         self.values
             .get(identifier)
-            .or_else(|| self.parent.and_then(|parent| parent.resolve(identifier)))
+            .map(|value| (*value).clone())
+            .or_else(|| {
+                self.parent
+                    .as_ref()
+                    .and_then(|parent| (**parent).borrow().resolve(identifier))
+            })
     }
-    fn insert(&mut self, identifier: String, expression: Rc<Exp>) {
-        self.values.insert(identifier, expression);
+
+    fn insert(&mut self, identifier: String, value: Rc<Value>) {
+        self.values.insert(identifier, value);
     }
 }
 
 #[allow(unused)]
-pub fn eval(top: Top, env: &mut Env) -> Result<Option<Rc<Exp>>, String> {
+pub fn eval(top: Top, env: &Rc<RefCell<Env>>) -> Result<Option<Rc<Value>>, String> {
     let res = match top {
         Top::DEC {
             identifier,
             expression,
         } => {
             let value = eval_expr(expression, env).ok_or("error")?;
-            env.insert(identifier, value);
+            env.borrow_mut().insert(identifier, value);
             None
         }
-        Top::EXP { expression } => {
-            eval_expr(expression, env)
-        }
+        Top::EXP { expression } => eval_expr(expression, env),
     };
     Ok(res)
 }
 
-fn eval_expr(expr: Rc<Exp>, env: &mut Env) -> Option<Rc<Exp>> {
+// I can match RC instead
+fn eval_expr(expr: Rc<Exp>, env: &Rc<RefCell<Env>>) -> Option<Rc<Value>> {
     match &*expr {
-        Exp::IDENTIFIER(identifier) => env.resolve(&identifier).cloned(),
-        Exp::LITERIAL(_) | Exp::LAMBDA { .. } => Some(expr),
+        Exp::IDENTIFIER(identifier) => (**env).borrow().resolve(&identifier),
+        Exp::LITERIAL(datum) => match (**datum).borrow() {
+            Datum::LAMBDA(lambda) => Some(Rc::new(Value::CLOSURE(Rc::new(Clojure {
+                proto: lambda.clone(),
+                env: env.clone(),
+            })))),
+            _ => Some(Rc::new(Value::DATUM(datum.clone()))),
+        },
         Exp::CALL { operator, operands } => {
             let operator = eval_expr(operator.clone(), env)?;
             let operands = operands
@@ -66,40 +92,48 @@ fn eval_expr(expr: Rc<Exp>, env: &mut Env) -> Option<Rc<Exp>> {
             alternative,
         } => {
             let test = eval_expr(test.clone(), env)?;
-            if let Exp::LITERIAL(Datum::BOOLEAN(true)) = *test {
-                eval_expr(consequent.clone(), env)
-            } else {
-                if let Some(alternative) = alternative {
-                    eval_expr(alternative.clone(), env)
+            if let Value::DATUM(datum) = (*test).borrow() {
+                if let Datum::BOOLEAN(true) = (*datum).borrow() {
+                    return eval_expr(consequent.clone(), env);
                 } else {
-                    None
+                    if let Some(alternative) = alternative {
+                        return eval_expr(alternative.clone(), env);
+                    }
                 }
             }
+            None
         }
     }
 }
 
 #[allow(unused)]
-fn apply(operator: Rc<Exp>, operands: Vec<Rc<Exp>>, env: &mut Env) -> Option<Rc<Exp>> {
+fn apply(
+    operator: Rc<Value>,
+    operands: Vec<Rc<Value>>,
+    env: &Rc<RefCell<Env>>,
+) -> Option<Rc<Value>> {
     match &*operator {
-        Exp::LAMBDA {
-            parameters,
-            definitions,
-            body,
-        } => {
+        Value::CLOSURE(clojure) => {
+            let Lambda {
+                parameters,
+                definitions,
+                body,
+            } = &*clojure.proto;
+            let env = &clojure.env;
             if parameters.len() != operands.len() {
                 println!("wrong number of arguments!");
                 return None;
             }
-            let mut env = Env::with_parent(env);
+            // should use lexical scope
+            let mut env = Rc::new(RefCell::new(Env::with_parent(env.clone())));
             for (parameter, operand) in parameters.iter().zip(operands) {
-                env.insert(parameter.clone(), operand);
+                env.borrow_mut().insert(parameter.clone(), operand);
             }
             for (identifier, expression) in definitions {
-                let value = eval_expr(expression.clone(), &mut env)?;
-                env.insert(identifier.clone(), value);
+                let value = eval_expr(expression.clone(), &env)?;
+                env.borrow_mut().insert(identifier.clone(), value);
             }
-            eval_expr(body.clone(), &mut env)
+            eval_expr(body.clone(), &env)
         }
         _ => {
             println!("call on non-function!");
