@@ -24,7 +24,7 @@ struct Opt {
 
 fn repl() {
     let mut line = String::new();
-    let mut env = Rc::new(RefCell::new(Env::new()));
+    let env = Rc::new(RefCell::new(Env::new()));
     loop {
         print!("> ");
         stdout().flush().unwrap();
