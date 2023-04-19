@@ -1,5 +1,6 @@
 use pest::iterators::{Pair, Pairs};
 use pest::Parser;
+use std::fmt::Display;
 use std::rc::Rc;
 
 #[derive(Parser)]
@@ -84,6 +85,24 @@ pub enum Datum {
     ABBR(Rc<Datum>),
     PAIR((Option<Rc<Datum>>, Option<Rc<Datum>>)),
     NIL,
+}
+
+impl Display for Datum {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Datum::LAMBDA(lambda) => write!(f, "#<lambda {:?}>", lambda),
+            Datum::NUMBER(number) => write!(f, "{}", number),
+            Datum::BOOLEAN(boolean) => write!(f, "{}", boolean),
+            Datum::STRING(string) => write!(f, "{}", string),
+            Datum::SYMBOL(symbol) => write!(f, "{}", symbol),
+            Datum::ABBR(datum) => write!(f, "'{}", datum),
+            Datum::PAIR((Some(car), Some(cdr))) => write!(f, "({} . {})", car, cdr),
+            Datum::PAIR((Some(car), None)) => write!(f, "({})", car),
+            Datum::PAIR((None, Some(cdr))) => write!(f, "({})", cdr),
+            Datum::PAIR((None, None)) => write!(f, "()"),
+            Datum::NIL => write!(f, "()"),
+        }
+    }
 }
 
 #[derive(Debug)]

@@ -1,7 +1,8 @@
 use crate::parser::*;
-use std::borrow::Borrow;
+use crate::builtin::get_builtins;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::rc::Rc;
 
 #[derive(Debug)]
@@ -20,9 +21,27 @@ pub struct Clojure {
 pub enum Value {
     DATUM(Rc<Datum>),
     CLOSURE(Rc<Clojure>),
+    BUILTIN(fn(Vec<Rc<Value>>) -> Option<Rc<Value>>),
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::DATUM(datum) => write!(f, "{}", datum),
+            Value::CLOSURE(clojure) => write!(f, "#<clojure {:?}>", clojure),
+            Value::BUILTIN(_) => write!(f, "#<builtin>"),
+        }
+    }
 }
 
 impl Env {
+    pub fn get_initialized_env() -> Rc<RefCell<Env>> {
+        let env = Rc::new(RefCell::new(Env::new()));
+        for (name, func) in get_builtins() {
+            env.borrow_mut().insert(name.to_string(), Rc::new(Value::BUILTIN(func)));
+        }
+        env
+    }
     pub fn new() -> Self {
         Self {
             parent: None,
@@ -42,7 +61,7 @@ impl Env {
             .or_else(|| {
                 self.parent
                     .as_ref()
-                    .and_then(|parent| (**parent).borrow().resolve(identifier))
+                    .and_then(|parent| (parent.borrow().resolve(identifier)))
             })
     }
 
@@ -67,11 +86,10 @@ pub fn eval(top: Top, env: &Rc<RefCell<Env>>) -> Result<Option<Rc<Value>>, Strin
     Ok(res)
 }
 
-// I can match RC instead
 fn eval_expr(expr: Rc<Exp>, env: &Rc<RefCell<Env>>) -> Option<Rc<Value>> {
     match &*expr {
-        Exp::IDENTIFIER(identifier) => (**env).borrow().resolve(&identifier),
-        Exp::LITERIAL(datum) => match (**datum).borrow() {
+        Exp::IDENTIFIER(identifier) => env.borrow().resolve(&identifier),
+        Exp::LITERIAL(datum) => match &**datum {
             Datum::LAMBDA(lambda) => Some(Rc::new(Value::CLOSURE(Rc::new(Clojure {
                 proto: lambda.clone(),
                 env: env.clone(),
@@ -92,8 +110,8 @@ fn eval_expr(expr: Rc<Exp>, env: &Rc<RefCell<Env>>) -> Option<Rc<Value>> {
             alternative,
         } => {
             let test = eval_expr(test.clone(), env)?;
-            if let Value::DATUM(datum) = (*test).borrow() {
-                if let Datum::BOOLEAN(true) = (*datum).borrow() {
+            if let Value::DATUM(datum) = &*test {
+                if let Datum::BOOLEAN(true) = &**datum {
                     return eval_expr(consequent.clone(), env);
                 } else {
                     if let Some(alternative) = alternative {
@@ -113,6 +131,7 @@ fn apply(
     env: &Rc<RefCell<Env>>,
 ) -> Option<Rc<Value>> {
     match &*operator {
+        Value::BUILTIN(builtin) => builtin(operands),
         Value::CLOSURE(clojure) => {
             let Lambda {
                 parameters,

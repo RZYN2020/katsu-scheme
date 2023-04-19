@@ -2,8 +2,9 @@ extern crate pest;
 #[macro_use]
 extern crate pest_derive;
 
+mod parser; 
 mod interpreter;
-mod parser; // parse input string to S-expresion // interpreter
+mod builtin;
 
 use clap::Parser;
 use interpreter::{Env, Value};
@@ -24,19 +25,22 @@ struct Opt {
 
 fn repl() {
     let mut line = String::new();
-    let env = Rc::new(RefCell::new(Env::new()));
+    let env = interpreter::Env::get_initialized_env();
+
     loop {
         print!("> ");
         stdout().flush().unwrap();
         stdin().read_line(&mut line).unwrap();
-        if line.trim() == "quit" || line.trim() == "q" {
+        if line.trim().eq("quit") || line.eq("q") {
             break;
         } else if line.is_empty() {
             continue;
         }
         let res = run(&line, &env);
         if let Some(res) = res {
-            println!("{:?}", res);
+            println!("{}", res);
+        } else {
+            println!("No result");
         }
     }
 }
@@ -45,7 +49,7 @@ fn run(program: &str, env: &Rc<RefCell<Env>>) -> Option<Rc<Value>> {
     let ast = parser::parse(&program, "init").unwrap();
     let mut res = None;
     for top in ast.tops {
-        res = interpreter::eval(top, &env).unwrap();
+        res = interpreter::eval(top, env).unwrap();
     }
     res
 }
@@ -55,40 +59,16 @@ fn main() {
 
     if let Some(file) = opt.file {
         let program = std::fs::read_to_string(file).unwrap();
-        let env = Rc::new(RefCell::new(Env::new()));
+        let env = interpreter::Env::get_initialized_env();
         run(&program, &env);
     } else if opt.interactive {
         repl();
     } else {
+        repl();
         println!("No input file or interactive mode");
     }
 }
 
+#[cfg(test)]
 mod test {
-
-    enum Foo {
-        A(Box<i32>),
-        B(String),
-    }
-
-    impl Drop for Foo {
-        fn drop(&mut self) {
-            match self {
-                Foo::B(s) => {
-                    println!("{}", s);
-                }
-                Foo::A(i) => {
-                    println!("{}", i);
-                }
-                _ => {}
-            }
-        }
-    }
-
-    #[test]
-    fn test0() {
-        let a = Foo::A(Box::new(1));
-        let b = Foo::B("hello".to_string());
-        let c = Foo::A(Box::new(2));
-    }
 }
