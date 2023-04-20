@@ -54,12 +54,28 @@ consequent = { exp }
 alternate  = { exp | "" }
 
 derived     = {
-    "(" ~ "cond" ~ cond_clause* ~ ")"
-  | "(" ~ "cond" ~ cond_clause+ ~ "(" ~ "else" ~ exp ~ ")" ~ ")"
-  | "(" ~ "and" ~ test* ~ ")"
-  | "(" ~ "or" ~ test* ~ ")"
-  | "(" ~ "let" ~ "(" ~ binding* ~ ")" ~ exp ~ ")"
+    no_else_cond
+  | else_cond
+  | and
+  | or
+  | let_exp
 }
+no_else_cond = {
+  "(" ~ "cond" ~ cond_clause* ~ ")"
+}
+else_cond = {
+  "(" ~ "cond" ~ cond_clause+ ~ "(" ~ "else" ~ exp ~ ")" ~ ")"
+}
+and = {
+  "(" ~ "and" ~ test* ~ ")"
+}
+or = {
+  "(" ~ "or" ~ test* ~ ")"
+}
+let_exp = {
+  "(" ~ "let" ~ "(" ~ binding* ~ ")" ~ exp ~ ")"
+}
+
 cond_clause = {
     "(" ~ test ~ exp ~ ")"
 }

@@ -230,6 +230,93 @@ fn build_cond(pair: Pair<Rule>) -> Option<Exp> {
     });
 }
 
+fn build_derived(pair: Pair<Rule>) -> Option<Exp> {
+    let pair = pair.into_inner().next()?;
+    match pair.as_rule() {
+        Rule::no_else_cond => {
+            let mut current = Some(Exp::LITERIAL(Rc::new(Datum::NIL)));
+            let mut conds = pair.into_inner().rev();
+            while let Some(pair) = conds.next() {
+                let mut pairs = pair.into_inner();
+                let test = Rc::new(build_exp(inner2!(pairs.next()?))?);
+                let consequent = Rc::new(build_exp(inner1!(pairs.next()?))?);
+                current = Some(Exp::COND {
+                    test,
+                    consequent,
+                    alternative: Some(Rc::new(current?)),
+                });
+            }
+            current
+        }
+        Rule::else_cond => {
+            let mut pairs = pair.into_inner();
+            let mut current = Some(build_exp(inner1!(pairs.next()?))?);
+            let mut conds = pairs.next()?.into_inner().rev();
+            while let Some(pair) = conds.next() {
+                let mut pairs = pair.into_inner();
+                let test = Rc::new(build_exp(inner2!(pairs.next()?))?);
+                let consequent = Rc::new(build_exp(inner1!(pairs.next()?))?);
+                current = Some(Exp::COND {
+                    test,
+                    consequent,
+                    alternative: Some(Rc::new(current?)),
+                });
+            }
+            current
+        }
+        Rule::and => {
+            let mut current = Some(Exp::LITERIAL(Rc::new(Datum::BOOLEAN(true))));
+            let mut pairs = pair.into_inner().rev();
+            while let Some(pair) = pairs.next() {
+                let test = Rc::new(build_exp(inner2!(pair))?);
+                current = Some(Exp::COND {
+                    test,
+                    consequent: Rc::new(current?),
+                    alternative: Some(Rc::new(Exp::LITERIAL(Rc::new(
+                        Datum::BOOLEAN(false),
+                    )))),
+                });
+            }
+            current
+        }
+        Rule::or => {
+            let mut current = Some(Exp::LITERIAL(Rc::new(Datum::BOOLEAN(false))));
+            let mut pairs = pair.into_inner().rev();
+            while let Some(pair) = pairs.next() {
+                let test = Rc::new(build_exp(inner2!(pair))?);
+                current = Some(Exp::COND {
+                    test,
+                    consequent: Rc::new(Exp::LITERIAL(Rc::new(Datum::BOOLEAN(
+                        true,
+                    )))),
+                    alternative: Some(Rc::new(current?)),
+                });
+            }
+            current
+        }
+        Rule::let_exp => {
+            let mut pairs = pair.into_inner();
+            let mut definitions = Vec::new();
+            for pair in pairs.next()?.into_inner() {
+                let mut pairs = pair.into_inner();
+                let identifier = pairs.next()?.as_str().to_string();
+                let expression = Rc::new(build_exp(pairs.next()?)?);
+                definitions.push((identifier, expression));
+            }
+            let body = Rc::new(build_exp(inner1!(pairs.next()?))?);
+            Some(Exp::LITERIAL(Rc::new(Datum::LAMBDA(
+                Rc::new(Lambda {
+                    parameters: Vec::new(),
+                    definitions,
+                    body,
+                }),
+            ))))
+        }
+        _ => unreachable!(),
+    }
+}
+
+
 // IO can be classfied as (native) procedure
 // Derived Form can be transformed to normal expression
 fn build_exp(pair: Pair<Rule>) -> Option<Exp> {
@@ -245,7 +332,7 @@ fn build_exp(pair: Pair<Rule>) -> Option<Exp> {
         Rule::call => build_call(pair),
         Rule::lambda => build_lambda(pair),
         Rule::cond => build_cond(pair),
-        Rule::derived => None,
+        Rule::derived => build_derived(pair),
         _ => unreachable!(),
     }
 }
@@ -282,11 +369,23 @@ fn build_ast(pairs: Pairs<Rule>, name: &str) -> Option<Ast> {
     Some(ast)
 }
 
-pub fn parse(program: &str, name: &str) -> Option<Ast> {
-    let mut pairs = SchemeParser::parse(Rule::prog, program).ok()?;
-    pairs
-        .find(|pair| pair.as_rule() == Rule::prog)
-        .map(|pair| build_ast(pair.into_inner(), name))?
+pub fn parse(program: &str, name: &str) -> Ast {
+    let mut pairs = SchemeParser::parse(Rule::prog, program);
+    match pairs {
+        Ok(ref mut pairs) => {
+            let result = pairs
+                .find(|pair| pair.as_rule() == Rule::prog)
+                .map(|pair| build_ast(pair.into_inner(), name));
+            match result {
+                Some(Some(ast)) => ast,
+                _ => panic!("AST Building Error!!!"),
+            }
+        }
+        Err(e) => {
+            println!("{}", e);
+            panic!("Parse Error!!!");
+        }
+    }
 }
 
 mod test {

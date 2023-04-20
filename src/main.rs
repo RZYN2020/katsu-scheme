@@ -46,7 +46,7 @@ fn repl() {
 }
 
 fn run(program: &str, env: &Rc<RefCell<Env>>) -> Option<Rc<Value>> {
-    let ast = parser::parse(&program, "init").unwrap();
+    let ast = parser::parse(&program, "init");
     let mut res = None;
     for top in ast.tops {
         res = interpreter::eval(top, env).unwrap();
