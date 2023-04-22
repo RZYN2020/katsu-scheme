@@ -87,6 +87,7 @@ pub fn eval(top: Top, env: &Rc<RefCell<Env>>) -> Result<Option<Rc<Value>>, Strin
 }
 
 fn eval_expr(expr: Rc<Exp>, env: &Rc<RefCell<Env>>) -> Option<Rc<Value>> {
+    // println!("eval_expr: {:?}", expr);
     match &*expr {
         Exp::IDENTIFIER(identifier) => env.borrow().resolve(&identifier),
         Exp::LITERIAL(datum) => match &**datum {

@@ -43,7 +43,7 @@ operand  = { exp }
 lambda  = {
     "(" ~ "lambda" ~ "(" ~ formals ~ ")" ~ definitions ~ exp ~ ")"
 }
-formals = { identifier | "(" ~ identifier* ~ ")" }
+formals = { "(" ~ identifier* ~ ")" }
 definitions = { def* }
 
 cond       = {
