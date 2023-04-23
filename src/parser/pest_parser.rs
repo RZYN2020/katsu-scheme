@@ -1,11 +1,18 @@
-use pest::iterators::{Pair, Pairs};
+use pest::iterators::{Pairs, Pair};
 use pest::Parser;
-use std::fmt::Display;
-use std::rc::Rc;
+pub struct PestParser;
+
+use super::*;
 
 #[derive(Parser)]
 #[grammar = "scheme.pest"]
-pub struct SchemeParser;
+pub struct PestDriver;
+
+impl PestParser {
+    pub fn new () -> Self {
+        Self {}
+    }
+}
 
 macro_rules! handle_literals {
     ($item:expr) => {
@@ -43,74 +50,6 @@ macro_rules! inner2 {
     };
 }
 
-#[derive(Debug)]
-pub struct Ast {
-    pub name: String,
-    pub tops: Vec<Top>,
-}
-
-#[derive(Debug)]
-pub enum Top {
-    DEC {
-        identifier: String,
-        expression: Rc<Exp>,
-    },
-    EXP {
-        expression: Rc<Exp>,
-    },
-}
-
-#[derive(Debug)]
-pub enum Exp {
-    IDENTIFIER(String),
-    LITERIAL(Rc<Datum>),
-    CALL {
-        operator: Rc<Exp>,
-        operands: Vec<Rc<Exp>>,
-    },
-    COND {
-        test: Rc<Exp>,
-        consequent: Rc<Exp>,
-        alternative: Option<Rc<Exp>>,
-    },
-}
-
-#[derive(Debug)]
-pub enum Datum {
-    LAMBDA(Rc<Lambda>),
-    NUMBER(i64),
-    BOOLEAN(bool),
-    STRING(String),
-    SYMBOL(String),
-    ABBR(Rc<Datum>),
-    PAIR((Option<Rc<Datum>>, Option<Rc<Datum>>)),
-    NIL,
-}
-
-impl Display for Datum {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Datum::LAMBDA(lambda) => write!(f, "#<lambda {:?}>", lambda),
-            Datum::NUMBER(number) => write!(f, "{}", number),
-            Datum::BOOLEAN(boolean) => write!(f, "{}", boolean),
-            Datum::STRING(string) => write!(f, "{}", string),
-            Datum::SYMBOL(symbol) => write!(f, "{}", symbol),
-            Datum::ABBR(datum) => write!(f, "'{}", datum),
-            Datum::PAIR((Some(car), Some(cdr))) => write!(f, "({} . {})", car, cdr),
-            Datum::PAIR((Some(car), None)) => write!(f, "({})", car),
-            Datum::PAIR((None, Some(cdr))) => write!(f, "({})", cdr),
-            Datum::PAIR((None, None)) => write!(f, "()"),
-            Datum::NIL => write!(f, "()"),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct Lambda {
-    pub parameters: Vec<String>,
-    pub definitions: Vec<(String, Rc<Exp>)>,
-    pub body: Rc<Exp>,
-}
 
 fn build_compound(pair: Pair<Rule>) -> Option<Datum> {
     let pair = inner1!(pair);
@@ -338,9 +277,8 @@ fn build_exp(pair: Pair<Rule>) -> Option<Exp> {
 }
 
 // Traverse the parse tree to build the AST
-fn build_ast(pairs: Pairs<Rule>, name: &str) -> Option<Ast> {
+fn build_ast(pairs: Pairs<Rule>) -> Option<Ast> {
     let mut ast = Ast {
-        name: String::from(name),
         tops: Vec::new(),
     };
     for pair in pairs {
@@ -369,36 +307,24 @@ fn build_ast(pairs: Pairs<Rule>, name: &str) -> Option<Ast> {
     Some(ast)
 }
 
-pub fn parse(program: &str, name: &str) -> Ast {
-    let mut pairs = SchemeParser::parse(Rule::prog, program);
-    match pairs {
-        Ok(ref mut pairs) => {
-            let result = pairs
-                .find(|pair| pair.as_rule() == Rule::prog)
-                .map(|pair| build_ast(pair.into_inner(), name));
-            match result {
-                Some(Some(ast)) => ast,
-                _ => panic!("AST Building Error!!!"),
+
+impl SchemeParser for PestParser {
+    fn parse(&self, program: &str) -> Ast {
+        let mut pairs = PestDriver::parse(Rule::prog, program);
+        match pairs {
+            Ok(ref mut pairs) => {
+                let result = pairs
+                    .find(|pair| pair.as_rule() == Rule::prog)
+                    .map(|pair| build_ast(pair.into_inner()));
+                match result {
+                    Some(Some(ast)) => ast,
+                    _ => panic!("AST Building Error!!!"),
+                }
+            }
+            Err(e) => {
+                println!("{}", e);
+                panic!("Parse Error!!!");
             }
         }
-        Err(e) => {
-            println!("{}", e);
-            panic!("Parse Error!!!");
-        }
-    }
-}
-
-mod test {
-    #[allow(unused)]
-    use crate::parser::*;
-    #[test]
-    fn test_fib() {
-        // fib only use if
-        let program = "(define fib (lambda (n) (if (= n 0) 0 (if (= n 1) 1 (+ (fib (- n 1)) (fib (- n 2)))))))";
-        let mut pairs = SchemeParser::parse(Rule::prog, program).unwrap();
-        println!(
-            "{:?}",
-            build_ast(pairs.next().unwrap().into_inner(), "name")
-        );
     }
 }

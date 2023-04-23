@@ -23,7 +23,7 @@ impl Katsu {
         Self { env }
     }
     pub fn eval(&self, program: &str) -> Vec<Option<Rc<Value>>> {
-        let ast = parse(&program, "init");
+        let ast = parse(&program);
         let mut res = Vec::new();
         for top in ast.tops {
             res.push(interpreter::eval(top, &self.env).unwrap());
@@ -40,7 +40,7 @@ impl Katsu {
             .collect()
     }
     pub fn eval_all(&self, program: &str) -> ResIterator {
-        ResIterator::new(parse(&program, "init"), self)
+        ResIterator::new(parse(&program), self)
     }
 }
 

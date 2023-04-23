@@ -1,7 +1,4 @@
 // reference to src/interpreter.rs
-
-use core::prelude;
-
 use katsu::Katsu;
 use regex::Regex;
 
@@ -13,6 +10,7 @@ macro_rules! cap_to_string {
 
 #[test]
 fn run_all_test() {
+    std::env::set_var("PARSER", "pest");
     let katsu = Katsu::new();
     let tests = include_str!("test.ss");
     // the value after ; in each line is the expected result
@@ -31,6 +29,7 @@ fn run_all_test() {
 
 #[test]
 fn test() {
+    std::env::set_var("PARSER", "pest");
     let katsu = Katsu::new();
     let prelude = "(define list (lambda l l))";
     let test = "(list 1 2 3)";
