@@ -1,15 +1,15 @@
 use super::*;
 
-pub struct HandParser;
+pub struct SyuParser;
 
-impl HandParser {
+impl SyuParser {
     pub fn new () -> Self {
         Self {}
     }
 }
 
-impl SchemeParser for HandParser {
-    fn parse(&self, program: &str) -> Ast {
+impl SchemeParser for SyuParser {
+    fn parse(&self, _program: &str) -> Ast {
         Ast {
             tops: Vec::new(),
         }

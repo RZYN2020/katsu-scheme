@@ -24,18 +24,17 @@
 
 
 ; list 
-(list 1 2 3) ; >(1 2 3)
+(define list (lambda l l)) ;>None
+(list 1 2 3) ; >(1 . (2 . (3 . NIL)))
 (car (list 1 2 3)) ; >1
-(cdr (list 1 2 3)) ; >(2 3)
-(cons 1 (list 2 3)) ; >(1 2 3)
-(cons (list 1 2) (list 3 4)) ; >((1 2) 3 4)
+(cdr (list 1 2 3)) ; >(2 . (3 . NIL))
+(cons 1 (list 2 3)) ; >(1 . (2 . (3 . NIL)))
+(cons (list 1 2) (list 3 4)) ; >((1 . (2 . NIL)) . (3 . (4 . NIL)))
 
 ; complex
 (define fact (lambda (n) (if (< n 2) 1 (* n (fact (- n 1)))))) ;>None
 (fact 10) ;>3628800
 (((lambda (mk-length) (mk-length mk-length)) (lambda (mk-length) (lambda (l) (if (null? l) 0 (+ 1 ((mk-length mk-length) (cdr l))))))) (list 1 2 3)) ;>None
 (define Y (lambda (le) ((lambda (f) (f f)) (lambda (f) (le (lambda (x) ((f f) x))))))) ;>None
-(define Y2 (lambda (le) ((lambda (f) (f f)) (lambda (f) (le (lambda (x1 x2) ((f f) x1 x2))))))) ;>None
-(define YS (lambda (le) ((lambda (f) (f f)) (lambda (f) (le (lambda x (apply (f f) x))))))) ;>None
 (define facty (Y (lambda (facty) (lambda (n) (if (< n 2) 1 (* n (facty (- n 1)))))))) ;>None
 (facty 10) ;>3628800

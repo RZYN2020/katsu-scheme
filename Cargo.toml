@@ -9,14 +9,6 @@ authors = ["Zhao Yongzhen <zhaoyzzz@outlook.com>"]
 [dependencies]
 pest = "2.0"
 regex = "1"
-log = "0.4"
 pest_derive = "2.0"
-lazy_static = "1.4.0"
 clap = { version = "3.1.18", features = ["derive"] }
-
-[dependencies.bril-rs]
-version = "0.1.0"
-path = "../bril/bril-rs"
-features = ["ssa", "memory", "float", "speculate", "position"]
-
 
